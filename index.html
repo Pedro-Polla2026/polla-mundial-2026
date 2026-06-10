@@ -249,7 +249,7 @@ async function handleLogin(name,pass){
   const id=user?user.id:(isAdmin?"admin":"u_"+Date.now());
   try{
     setSyncStatus("syncing");
-    await upsert("users",{id,name:name.trim(),is_admin:isAdmin});
+    await fetch(`${SB_URL}/rest/v1/users`,{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id,name:name.trim(),is_admin:isAdmin})});
     if(!user){
       user={id,name:name.trim(),is_admin:isAdmin};
       STATE.users.push(user);
