@@ -219,12 +219,21 @@ setInterval(async()=>{
   if(!currentUser)return;
   await loadAll();
   checkAutoLock();
+  // Don't re-render if user is actively typing in an input
+  const active=document.activeElement;
+  if(active&&active.classList.contains("score-input"))return;
   render();
 },30000);
 
 // ═══════════════════════════════════════════════════
 // TOAST & UTILS
 // ═══════════════════════════════════════════════════
+// Debounce save for mobile — saves 1.5s after last keystroke
+const saveTimers={};
+function scheduleSave(matchId){
+  if(saveTimers[matchId])clearTimeout(saveTimers[matchId]);
+  saveTimers[matchId]=setTimeout(()=>savePred(matchId),1500);
+}
 function toast(msg,isErr=false){
   const t=document.getElementById("toast");t.textContent=msg;
   t.style.background=isErr?"#DC3545":"#222";t.classList.add("show");
@@ -249,7 +258,7 @@ async function handleLogin(name,pass){
   const id=user?user.id:(isAdmin?"admin":"u_"+Date.now());
   try{
     setSyncStatus("syncing");
-    await fetch(`${SB_URL}/rest/v1/users`,{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id,name:name.trim(),is_admin:isAdmin})});
+    await upsert("users",{id,name:name.trim(),is_admin:isAdmin});
     if(!user){
       user={id,name:name.trim(),is_admin:isAdmin};
       STATE.users.push(user);
@@ -434,9 +443,9 @@ function renderPronos(){
         <div style="text-align:center;min-width:120px">
           <div style="font-size:.62rem;color:var(--muted);margin-bottom:2px">${m.datetime?fmtDate(m.datetime):m.group||""}</div>
           <div class="score-inputs">
-            <input class="score-input" type="number" min="0" max="20" value="${pred.home}" id="ph_${m.id}" onchange="savePred('${m.id}')" style="width:40px;height:35px;font-size:.88rem">
+            <input class="score-input" type="number" min="0" max="20" value="${pred.home}" id="ph_${m.id}" onblur="savePred('${m.id}')" oninput="scheduleSave('${m.id}')" style="width:40px;height:35px;font-size:.88rem">
             <span class="score-sep">–</span>
-            <input class="score-input" type="number" min="0" max="20" value="${pred.away}" id="pa_${m.id}" onchange="savePred('${m.id}')" style="width:40px;height:35px;font-size:.88rem">
+            <input class="score-input" type="number" min="0" max="20" value="${pred.away}" id="pa_${m.id}" onblur="savePred('${m.id}')" oninput="scheduleSave('${m.id}')" style="width:40px;height:35px;font-size:.88rem">
           </div>
           <div style="font-size:.6rem;margin-top:2px;${hasPred?"color:var(--success);font-weight:600":"color:var(--danger)"}">${hasPred?"✓ guardado":"sin pronosticar"}</div>
         </div>
@@ -500,9 +509,9 @@ function renderPronos(){
       </div><div class="match-teams">
         <div class="team-left"><span class="team-name">${m.home}</span></div>
         <div class="score-inputs">
-          <input class="score-input" type="number" min="0" max="20" value="${pred.home}" id="ph_${m.id}" onchange="savePred('${m.id}')">
+          <input class="score-input" type="number" min="0" max="20" value="${pred.home}" id="ph_${m.id}" onblur="savePred('${m.id}')" oninput="scheduleSave('${m.id}')">
           <span class="score-sep">–</span>
-          <input class="score-input" type="number" min="0" max="20" value="${pred.away}" id="pa_${m.id}" onchange="savePred('${m.id}')">
+          <input class="score-input" type="number" min="0" max="20" value="${pred.away}" id="pa_${m.id}" onblur="savePred('${m.id}')" oninput="scheduleSave('${m.id}')">
         </div>
         <div class="team-right"><span class="team-name">${m.away}</span></div>
       </div></div>`;
