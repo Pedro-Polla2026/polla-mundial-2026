@@ -124,6 +124,20 @@ input:focus,select:focus{outline:none;border-color:var(--green3);box-shadow:0 0 
 // ═══════════════════════════════════════════════════
 const SB_URL = "https://lgydaitcaapntqlymyzf.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneWRhaXRjYWFwbnRxbHlteXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNDY2MzEsImV4cCI6MjA5NjYyMjYzMX0.oyLF3srWizbqv76H7oRpzVladPDX7lBEB2yuHHmT8F0";
+
+// Test connection
+async function testConnection(){
+  try{
+    const res = await fetch(`${SB_URL}/rest/v1/config?key=eq.champion`, {
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
+    });
+    console.log("Supabase test:", res.status, res.ok);
+    return res.ok;
+  }catch(e){
+    console.error("Supabase connection error:", e.message);
+    return false;
+  }
+}
 const ADMIN_PASS = "admin2026";
 const INSCRIPTION = 20000;
 
@@ -146,10 +160,10 @@ const dbDelete=(t,q)=>sb(t,"DELETE",null,`?${q}`);
 // Upsert helper using Prefer: resolution=merge-duplicates
 async function upsert(table, data){
   const url=`${SB_URL}/rest/v1/${table}`;
-  const headers={"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"resolution=merge-duplicates,return=representation"};
+  const headers={"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"resolution=merge-duplicates,return=minimal"};
   const res=await fetch(url,{method:"POST",headers,body:JSON.stringify(data)});
   if(!res.ok){const e=await res.text();throw new Error(`upsert ${table}: ${res.status} ${e}`);}
-  return res.status===204?null:res.json();
+  return null;
 }
 
 // ═══════════════════════════════════════════════════
