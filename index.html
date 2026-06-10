@@ -447,7 +447,7 @@ function renderPronos(){
             <span class="score-sep">–</span>
             <input class="score-input" type="number" min="0" max="20" value="${pred.away}" id="pa_${m.id}" onblur="savePred('${m.id}')" oninput="scheduleSave('${m.id}')" style="width:40px;height:35px;font-size:.88rem">
           </div>
-          <div style="font-size:.6rem;margin-top:2px;${hasPred?"color:var(--success);font-weight:600":"color:var(--danger)"}">${hasPred?"✓ guardado":"sin pronosticar"}</div>
+          <div id="lbl_${m.id}" style="font-size:.6rem;margin-top:2px;${hasPred?"color:var(--success);font-weight:600":"color:var(--danger)"}">${hasPred?"✓ guardado":"sin pronosticar"}</div>
         </div>
         <div style="text-align:left"><div class="team-name" style="font-size:.85rem">${m.away}</div></div>
       </div>`;
@@ -812,28 +812,28 @@ async function savePred(matchId){
   const hEl=document.getElementById("ph_"+matchId),aEl=document.getElementById("pa_"+matchId);
   if(!hEl||!aEl)return;
   const h=hEl.value,a=aEl.value;
-  if(h===""||a==="")return; // don't save incomplete
+  if(h===""||a==="")return;
   try{
     setSyncStatus("syncing");
-    // Try PATCH first (update existing), if 0 rows affected then POST (insert)
-    const patchRes=await fetch(`${SB_URL}/rest/v1/predictions?user_id=eq.${currentUser.id}&match_id=eq.${matchId}`,{
-      method:"PATCH",
-      headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"return=minimal"},
-      body:JSON.stringify({home:h,away:a,updated_at:new Date().toISOString()})
+    // DELETE existing then INSERT fresh — most reliable approach
+    await fetch(`${SB_URL}/rest/v1/predictions?user_id=eq.${encodeURIComponent(currentUser.id)}&match_id=eq.${encodeURIComponent(matchId)}`,{
+      method:"DELETE",
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
     });
-    const count=patchRes.headers.get("content-range");
-    // If no rows updated (count is 0 or null), insert new
-    if(!count||count.startsWith("*/0")||count==="0-0/0"){
-      await fetch(`${SB_URL}/rest/v1/predictions`,{
-        method:"POST",
-        headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"return=minimal"},
-        body:JSON.stringify({user_id:currentUser.id,match_id:matchId,home:h,away:a,updated_at:new Date().toISOString()})
-      });
-    }
+    const res=await fetch(`${SB_URL}/rest/v1/predictions`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"return=minimal"},
+      body:JSON.stringify({user_id:currentUser.id,match_id:matchId,home:h,away:a,updated_at:new Date().toISOString()})
+    });
+    if(!res.ok){const e=await res.text();throw new Error(e);}
     if(!STATE.predictions[currentUser.id])STATE.predictions[currentUser.id]={};
     STATE.predictions[currentUser.id][matchId]={home:h,away:a};
-    setSyncStatus("ok");toast("✅ Pronóstico guardado");
-  }catch(e){setSyncStatus("error");toast("Error guardando: "+e.message,true);}
+    setSyncStatus("ok");
+    // Update UI label without full re-render
+    const lbl=document.getElementById("lbl_"+matchId);
+    if(lbl){lbl.textContent="✓ guardado";lbl.style.color="var(--success)";}
+    toast("✅ Pronóstico guardado");
+  }catch(e){setSyncStatus("error");toast("Error: "+e.message,true);}
 }
 
 async function adminSetChampion(){
