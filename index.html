@@ -245,23 +245,18 @@ async function handleLogin(name,pass){
   if(!name.trim()){toast("Escribe tu nombre",true);return;}
   const isAdmin=pass===ADMIN_PASS;
   let user=STATE.users.find(u=>u.name.toLowerCase()===name.toLowerCase().trim());
-  if(!user){
-    const id=(isAdmin?"admin":"u_"+Date.now());
-    const newUser={id,name:name.trim(),is_admin:isAdmin};
-    try{
-      setSyncStatus("syncing");
-      await upsert("users",newUser);
-      user={id,name:name.trim(),isAdmin};
-      STATE.users.push({...user,is_admin:isAdmin});
-      setSyncStatus("ok");
-      if(!isAdmin)toast("¡Bienvenido "+user.name+"!");
-    }catch(e){setSyncStatus("error");toast("Error al registrar: "+e.message,true);return;}
-  }else if(isAdmin){
-    user={...user,isAdmin:true};
-  }else{
-    user={...user,isAdmin:user.is_admin||false};
-  }
-  currentUser={id:user.id,name:user.name||user.name,isAdmin:isAdmin||user.is_admin||false};
+  const id=user?user.id:(isAdmin?"admin":"u_"+Date.now());
+  try{
+    setSyncStatus("syncing");
+    await upsert("users",{id,name:name.trim(),is_admin:isAdmin});
+    if(!user){
+      user={id,name:name.trim(),is_admin:isAdmin};
+      STATE.users.push(user);
+      if(!isAdmin)toast("¡Bienvenido "+name.trim()+"!");
+    }
+    setSyncStatus("ok");
+  }catch(e){setSyncStatus("error");toast("Error al registrar: "+e.message,true);return;}
+  currentUser={id,name:name.trim(),isAdmin:isAdmin||user.is_admin||false};
   document.getElementById("header-user").textContent=currentUser.name+(currentUser.isAdmin?" ★":"");
   currentTab=currentUser.isAdmin?"admin":"pronos";
   render();
