@@ -32,7 +32,8 @@ main{flex:1;padding:1rem;max-width:880px;margin:0 auto;width:100%;}
 .vs{color:var(--muted);font-size:.82rem;font-weight:500;text-align:center;}
 .score-display{font-size:1.3rem;font-weight:700;color:var(--green);text-align:center;}
 .score-inputs{display:flex;align-items:center;gap:5px;justify-content:center;}
-.score-input{width:44px;height:38px;text-align:center;font-size:.95rem;font-weight:600;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:var(--text);}
+.score-input{width:52px;height:42px;text-align:center;font-size:1.1rem;font-weight:700;border:2px solid var(--border);border-radius:8px;background:#fff;color:var(--text);-moz-appearance:textfield;}
+.score-input::-webkit-outer-spin-button,.score-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 .score-input:focus{outline:none;border-color:var(--green3);box-shadow:0 0 0 3px rgba(64,145,108,.12);}
 .score-input:disabled{background:#F3F4F6;color:var(--muted);cursor:not-allowed;}
 .score-sep{font-size:1rem;font-weight:700;color:var(--muted);}
@@ -802,9 +803,24 @@ async function savePred(matchId){
   const hEl=document.getElementById("ph_"+matchId),aEl=document.getElementById("pa_"+matchId);
   if(!hEl||!aEl)return;
   const h=hEl.value,a=aEl.value;
+  if(h===""||a==="")return; // don't save incomplete
   try{
     setSyncStatus("syncing");
-    await upsert("predictions",{user_id:currentUser.id,match_id:matchId,home:h,away:a,updated_at:new Date().toISOString()});
+    // Try PATCH first (update existing), if 0 rows affected then POST (insert)
+    const patchRes=await fetch(`${SB_URL}/rest/v1/predictions?user_id=eq.${currentUser.id}&match_id=eq.${matchId}`,{
+      method:"PATCH",
+      headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"return=minimal"},
+      body:JSON.stringify({home:h,away:a,updated_at:new Date().toISOString()})
+    });
+    const count=patchRes.headers.get("content-range");
+    // If no rows updated (count is 0 or null), insert new
+    if(!count||count.startsWith("*/0")||count==="0-0/0"){
+      await fetch(`${SB_URL}/rest/v1/predictions`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Prefer":"return=minimal"},
+        body:JSON.stringify({user_id:currentUser.id,match_id:matchId,home:h,away:a,updated_at:new Date().toISOString()})
+      });
+    }
     if(!STATE.predictions[currentUser.id])STATE.predictions[currentUser.id]={};
     STATE.predictions[currentUser.id][matchId]={home:h,away:a};
     setSyncStatus("ok");toast("✅ Pronóstico guardado");
